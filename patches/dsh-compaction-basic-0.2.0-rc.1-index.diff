@@ -1,0 +1,28 @@
+--- a/@deepseek-ai/dsh-compaction-basic/lib/index.js
++++ b/@deepseek-ai/dsh-compaction-basic/lib/index.js
+@@ -740,6 +740,16 @@
+ * @module @deepseek-ai/dsh-compaction-basic
+ */
+ /** Resolve the exact provider/model durably routed for the latest request. */
++/**
++* dsh-patches (dsh-claude-code): whether the routed provider's step driver keeps
++* its own model context. Claude Code compacts its own context, and the plugin
++* mirrors those compactions into dsh, so dsh's pressure compaction must not run
++* on that route: it can't shrink Claude's context and only re-triggers.
++*/
++function stepDriverOwnsContext(agent) {
++	const provider = routedTarget(agent.session)?.provider;
++	return provider !== void 0 && agent.loopCtx?.agentLoop?.stepDrivers?.get(provider)?.ownsContext === true;
++}
+ function routedTarget(session) {
+ 	const config = session.requestHeader()?.config;
+ 	if (config === void 0 || config.provider.length === 0 || config.model.length === 0) return;
+@@ -837,7 +847,7 @@
+ 			ctx.logger.info(`compaction (${trigger}): shadowed ${result.shadowedSeqs.length} surface nodes (seqs ${result.shadowedRange.start}-${result.shadowedRange.end}, ~${result.shadowedTokenCount} tokens)`);
+ 		};
+ 		ctx.on("agent/pre-step", async ({ agent, signal }, next) => {
+-			if (!signal.aborted) try {
++			if (!signal.aborted && !stepDriverOwnsContext(agent)) try {
+ 				const result = await this.compactIfNeeded(agent, "pressure", signal);
+ 				if (result !== null) logResult(result, "step pressure");
+ 			} catch (error) {

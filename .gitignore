@@ -1,0 +1,20 @@
+# dependencies
+node_modules/
+tests/node_modules
+
+# build output (npm run build)
+lib/
+*.tsbuildinfo
+
+# packed tarballs (npm pack)
+*.tgz
+
+# logs and local env
+*.log
+.env
+.env.*
+
+# editor / OS
+.vscode/
+.idea/
+.DS_Store

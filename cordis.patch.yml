@@ -1,0 +1,8 @@
+# dsh-claude-code-provider bundle layer: registers the `claude-code` model provider.
+# Nothing else changes until a session picks a Claude Code model. The Claude
+# role subagent rows (claude_plan / claude_review) live in the agent preset.
+- insert:
+    - id: claude-code
+      name: 'dsh-claude-code-provider'
+      config:
+        stateDir: !!js dshHomePath('storages', 'claude-code')

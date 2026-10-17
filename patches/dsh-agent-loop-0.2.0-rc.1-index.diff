@@ -1,0 +1,54 @@
+--- a/@deepseek-ai/dsh-agent-loop/lib/index.js
++++ b/@deepseek-ai/dsh-agent-loop/lib/index.js
+@@ -1048,6 +1048,23 @@
+ 		let firstAttempt = true;
+ 		while (true) {
+ 			const { config, preparedCall } = await this.prepareRequest(turn, step, signal);
++			/* dsh-patches (dsh-claude-code): a provider route may own the whole step. */
++			const stepDriver = this.loopCtx.agentLoop.stepDrivers.get(config.provider);
++			if (stepDriver !== void 0) return await stepDriver.step({
++				agent: this,
++				turn,
++				step,
++				signal,
++				config,
++				preparedCall,
++				messages: firstAttempt ? decision.messages : [],
++				startsRequestSeries: firstAttempt && decision.startsRequestSeries === true,
++				assembly,
++				createAttempt: () => new AssistantStreamAttempt(this.session.id, ++this.assistantAttemptCounter, () => ++this.assistantStreamRevision, turn, step, (frame) => {
++					this.dispatch.emit("agent/assistant-stream", { frame });
++				}),
++				acceptContext: (context) => this.inbox.splice("next-step", this.inbox.nextStep.length, 0, [context])
++			});
+ 			const startsRequestSeries = firstAttempt && decision.startsRequestSeries === true;
+ 			const commits = this.systemPrompt.project(renderedPrompt, {
+ 				inHistory: preparedCall?.systemPromptUpdate === "in-history",
+@@ -1548,6 +1565,27 @@
+ 	ownership;
+ 	/** Plain holder prevents Cordis from re-tracing the factory's dependency context through a caller shadow. */
+ 	runtime;
++	/** dsh-patches (dsh-claude-code): provider route → driver that owns whole steps on that route. */
++	stepDrivers = /* @__PURE__ */ new Map();
++	/**
++	* dsh-patches (dsh-claude-code): let one provider route drive complete steps.
++	* The loop keeps turns, the inbox, steering, cancellation and persistence;
++	* after a step's route resolves to `provider`, `driver.step(context)` runs the
++	* step instead of the model request, returning `{ kind: 'completed' }`,
++	* `{ kind: 'max-tokens' }` or `null` (continue the turn with another step).
++	* @param provider - provider route the driver owns.
++	* @param driver - `{ step(context): Promise<StepEndReason | null> }`.
++	* @returns the effect disposer.
++	*/
++	registerStepDriver(provider, driver) {
++		return this.ctx.effect(() => {
++			if (this.stepDrivers.has(provider)) throw new Error(`a step driver for provider "${provider}" is already registered`);
++			this.stepDrivers.set(provider, driver);
++			return () => {
++				if (this.stepDrivers.get(provider) === driver) this.stepDrivers.delete(provider);
++			};
++		}, `agentLoop.registerStepDriver(${provider})`);
++	}
+ 	constructor(ctx, config) {
+ 		super(ctx, "agentLoop");
+ 		this.config = {
