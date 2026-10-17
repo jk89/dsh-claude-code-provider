@@ -33,6 +33,14 @@
   ],
   "author": "Jonathan Kelsey",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jk89/dsh-claude-code-provider.git"
+  },
+  "homepage": "https://github.com/jk89/dsh-claude-code-provider#readme",
+  "bugs": {
+    "url": "https://github.com/jk89/dsh-claude-code-provider/issues"
+  },
   "main": "lib/index.js",
   "exports": {
     ".": "./lib/index.js",
